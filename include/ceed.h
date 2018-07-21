@@ -223,12 +223,23 @@ typedef enum {
   CEED_GAUSS_LOBATTO = 1,
 } CeedQuadMode;
 
+/// Type of basis shape to create non-tensor H1 element basis
+/// @ingrounp CeedBasis
+typedef enum {
+  /// Simplex/tet - 2D or 3D shape
+  CEED_SIMPLEX = 0,
+  /// Pyramed - 3D shape
+  CEED_PRYAMED = 1,
+  /// Wedge - 3D shape
+  CEED_WEDGE = 2,
+} CeedBasisShape;
+
 CEED_EXTERN int CeedBasisCreateTensorH1Lagrange(Ceed ceed, CeedInt dim,
     CeedInt ndof, CeedInt P, CeedInt Q, CeedQuadMode qmode, CeedBasis *basis);
 CEED_EXTERN int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ndof,
                                         CeedInt P1d, CeedInt Q1d, const CeedScalar *interp1d, const CeedScalar *grad1d,
                                         const CeedScalar *qref1d, const CeedScalar *qweight1d, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim,
+CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
     CeedInt ndof, CeedInt P, CeedInt Q, CeedQuadMode qmode, CeedBasis *basis);
 CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedInt ndof,
                                    CeedInt P1d, CeedInt Q1d, const CeedScalar *interp, const CeedScalar *grad,
