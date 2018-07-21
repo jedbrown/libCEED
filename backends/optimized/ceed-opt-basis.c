@@ -60,6 +60,9 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
   const CeedInt nqpt = ncomp*CeedPowInt(basis->Q1d, dim);
   const CeedInt add = (tmode == CEED_TRANSPOSE);
 
+  if (!basis->tensorbasis) 
+    return CeedError(basis->ceed, 1, "Non-tensor bases not supported by this backend.");
+
   if (tmode == CEED_TRANSPOSE) {
     const CeedInt vsize = ncomp*CeedPowInt(basis->P1d, dim);
     for (CeedInt i = 0; i < vsize; i++)

@@ -594,6 +594,9 @@ static int CeedBasisApply_Magma(CeedBasis basis, CeedTransposeMode tmode,
   const CeedInt nqpt = ncomp*CeedPowInt(basis->Q1d, dim);
   const CeedInt add = (tmode == CEED_TRANSPOSE);
 
+  if (!basis->tensorbasis) 
+    return CeedError(basis->ceed, 1, "Non-tensor bases not supported by this backend.");
+
   CeedDebug("\033[01m[CeedBasisApply_Magma] vsize=%d",
             ncomp*CeedPowInt(basis->P1d, dim));
 

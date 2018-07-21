@@ -68,9 +68,9 @@ int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp, CeedInt P1d,
   ierr = CeedMalloc(Q1d*P1d,&(*basis)->grad); CeedChk(ierr);
   memcpy((*basis)->interp, interp1d, Q1d*P1d*sizeof(interp1d[0]));
   memcpy((*basis)->grad, grad1d, Q1d*P1d*sizeof(interp1d[0]));
+  (*basis)->tensorbasis = true;
   ierr = ceed->BasisCreateTensorH1(ceed, dim, P1d, Q1d, interp1d, grad1d, qref1d,
                                    qweight1d, *basis); CeedChk(ierr);
-  (*basis)->tensorbasis = true;
   return 0;
 }
 

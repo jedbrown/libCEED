@@ -133,6 +133,10 @@ int CeedBasisApplyElems_Occa(CeedBasis basis, CeedInt QnD,
   const Ceed ceed = basis->ceed;
   CeedBasis_Occa *data = basis->data;
   const CeedInt ready =  data->ready;
+
+  if (!basis->tensorbasis) 
+    return CeedError(basis->ceed, 1, "Non-tensor bases not supported by this backend.");
+
   // ***************************************************************************
   // We were waiting for the CeedElemRestriction to fill nelem and elemsize
   if (!ready) {
