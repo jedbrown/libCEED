@@ -87,17 +87,21 @@ struct CeedBasis_private {
                CeedScalar *);
   int (*Destroy)(CeedBasis);
   int refcount;
+  bool tensorbasis;      /* flag for tensor basis */
   CeedInt dim;           /* topological dimension */
   CeedInt ncomp;         /* number of field components (1 for scalar fields) */
   CeedInt P1d;           /* number of nodes in one dimension */
   CeedInt Q1d;           /* number of quadrature points in one dimension */
-  CeedScalar *qref1d;    /* Array of length Q1d holding the locations of 
-                            quadrature points on the 1D reference element [-1, 1] */
-  CeedScalar *qweight1d; /* array of length Q1d holding the quadrature weights on 
-                            the reference element */
-  CeedScalar *interp1d;  /* row-major Q1d × P1d matrix expressing the values of 
+  CeedScalar *qref;      /* Array of length Q1d (for tensor elements) holding the  
+                            locations of quadrature points on the 1D reference
+                            element [-1, 1] for tensor elements or all quadrature 
+                            points or other elements */
+  CeedScalar *qweight;   /* array of length Q1d (for tensor elements) holding the  
+                            quadrature weights on the reference element for tensor
+                             elements or all quadrature points or other elements */
+  CeedScalar *interp;    /* row-major Q1d × P1d matrix expressing the values of 
                             nodal basis functions at quadrature points */
-  CeedScalar *grad1d;    /* row-major Q1d × P1d matrix expressing derivatives of 
+  CeedScalar *grad;      /* row-major Q1d × P1d matrix expressing derivatives of 
                             nodal basis functions at quadrature points */
   void *data;            /* place for the backend to store any data */
 };

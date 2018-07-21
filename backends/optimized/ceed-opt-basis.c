@@ -73,7 +73,7 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
     CeedInt pre = ncomp*CeedPowInt(P, dim-1), post = 1;
     CeedScalar tmp[2][ncomp*Q*CeedPowInt(P>Q?P:Q, dim-1)];
     for (CeedInt d=0; d<dim; d++) {
-      ierr = CeedTensorContract_Opt(basis->ceed, pre, P, post, Q, basis->interp1d,
+      ierr = CeedTensorContract_Opt(basis->ceed, pre, P, post, Q, basis->interp,
                                     tmode, add&&(d==dim-1),
                                     d==0?u:tmp[d%2], d==dim-1?v:tmp[(d+1)%2]);
       CeedChk(ierr);
@@ -96,7 +96,7 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
       P = basis->Q1d, Q = basis->P1d;
     }
     if (dim == 1) {
-      ierr = CeedTensorContract_Opt(basis->ceed, ncomp, P, 1, Q, basis->grad1d,tmode,
+      ierr = CeedTensorContract_Opt(basis->ceed, ncomp, P, 1, Q, basis->grad,tmode,
                                     add, u, v); CeedChk(ierr);
     } else {
       if (tmode == CEED_TRANSPOSE) {
@@ -108,7 +108,7 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
       CeedScalar tmp[2][ncomp*Q*CeedPowInt(P>Q?P:Q, dim-1)];
       for (CeedInt d=0; d<dim; d++) {
         ierr = CeedTensorContract_Opt(basis->ceed, pre, P, post, Q,
-                                      tmode==CEED_NOTRANSPOSE?basis->interp1d:impl->colograd1d,
+                                      tmode==CEED_NOTRANSPOSE?basis->interp:impl->colograd1d,
                                       tmode, add&&(d>0),
                                       tmode==CEED_NOTRANSPOSE?(d==0?u:tmp[d%2]):u,
                                       tmode==CEED_NOTRANSPOSE?(d==dim-1?interp:tmp[(d+1)%2]):interp);
@@ -126,7 +126,7 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
       pre = ncomp*CeedPowInt(P, dim-1), post = 1;
       for (CeedInt d=0; d<dim; d++) {
         ierr = CeedTensorContract_Opt(basis->ceed, pre, P, post, Q,
-                                      tmode==CEED_NOTRANSPOSE?impl->colograd1d:basis->interp1d,
+                                      tmode==CEED_NOTRANSPOSE?impl->colograd1d:basis->interp,
                                       tmode, add&&(d==dim-1),
                                       tmode==CEED_NOTRANSPOSE?interp:(d==0?interp:tmp[d%2]),
                                       tmode==CEED_NOTRANSPOSE?v:(d==dim-1?v:tmp[(d+1)%2]));
@@ -149,7 +149,7 @@ static int CeedBasisApply_Opt(CeedBasis basis, CeedTransposeMode tmode,
       for (CeedInt i=0; i<pre; i++) {
         for (CeedInt j=0; j<Q; j++) {
           for (CeedInt k=0; k<post; k++) {
-            v[(i*Q + j)*post + k] = basis->qweight1d[j]
+            v[(i*Q + j)*post + k] = basis->qweight[j]
                                     * (d == 0 ? 1 : v[(i*Q + j)*post + k]);
           }
         }

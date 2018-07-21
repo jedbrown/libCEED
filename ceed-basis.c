@@ -60,16 +60,17 @@ int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp, CeedInt P1d,
   (*basis)->ncomp = ncomp;
   (*basis)->P1d = P1d;
   (*basis)->Q1d = Q1d;
-  ierr = CeedMalloc(Q1d,&(*basis)->qref1d); CeedChk(ierr);
-  ierr = CeedMalloc(Q1d,&(*basis)->qweight1d); CeedChk(ierr);
-  memcpy((*basis)->qref1d, qref1d, Q1d*sizeof(qref1d[0]));
-  memcpy((*basis)->qweight1d, qweight1d, Q1d*sizeof(qweight1d[0]));
-  ierr = CeedMalloc(Q1d*P1d,&(*basis)->interp1d); CeedChk(ierr);
-  ierr = CeedMalloc(Q1d*P1d,&(*basis)->grad1d); CeedChk(ierr);
-  memcpy((*basis)->interp1d, interp1d, Q1d*P1d*sizeof(interp1d[0]));
-  memcpy((*basis)->grad1d, grad1d, Q1d*P1d*sizeof(interp1d[0]));
+  ierr = CeedMalloc(Q1d,&(*basis)->qref); CeedChk(ierr);
+  ierr = CeedMalloc(Q1d,&(*basis)->qweight); CeedChk(ierr);
+  memcpy((*basis)->qref, qref1d, Q1d*sizeof(qref1d[0]));
+  memcpy((*basis)->qweight, qweight1d, Q1d*sizeof(qweight1d[0]));
+  ierr = CeedMalloc(Q1d*P1d,&(*basis)->interp); CeedChk(ierr);
+  ierr = CeedMalloc(Q1d*P1d,&(*basis)->grad); CeedChk(ierr);
+  memcpy((*basis)->interp, interp1d, Q1d*P1d*sizeof(interp1d[0]));
+  memcpy((*basis)->grad, grad1d, Q1d*P1d*sizeof(interp1d[0]));
   ierr = ceed->BasisCreateTensorH1(ceed, dim, P1d, Q1d, interp1d, grad1d, qref1d,
                                    qweight1d, *basis); CeedChk(ierr);
+  (*basis)->tensorbasis = true;
   return 0;
 }
 
@@ -271,14 +272,14 @@ int CeedBasisView(CeedBasis basis, FILE *stream) {
 
   fprintf(stream, "CeedBasis: dim=%d P=%d Q=%d\n", basis->dim, basis->P1d,
           basis->Q1d);
-  ierr = CeedScalarView("qref1d", "\t% 12.8f", 1, basis->Q1d, basis->qref1d,
+  ierr = CeedScalarView("qref", "\t% 12.8f", 1, basis->Q1d, basis->qref,
                         stream); CeedChk(ierr);
-  ierr = CeedScalarView("qweight1d", "\t% 12.8f", 1, basis->Q1d, basis->qweight1d,
+  ierr = CeedScalarView("qweight", "\t% 12.8f", 1, basis->Q1d, basis->qweight,
                         stream); CeedChk(ierr);
-  ierr = CeedScalarView("interp1d", "\t% 12.8f", basis->Q1d, basis->P1d,
-                        basis->interp1d, stream); CeedChk(ierr);
-  ierr = CeedScalarView("grad1d", "\t% 12.8f", basis->Q1d, basis->P1d,
-                        basis->grad1d, stream); CeedChk(ierr);
+  ierr = CeedScalarView("interp", "\t% 12.8f", basis->Q1d, basis->P1d,
+                        basis->interp, stream); CeedChk(ierr);
+  ierr = CeedScalarView("grad", "\t% 12.8f", basis->Q1d, basis->P1d,
+                        basis->grad, stream); CeedChk(ierr);
   return 0;
 }
 
@@ -363,8 +364,8 @@ int CeedBasisGetColocatedGrad(CeedBasis basis, CeedScalar *colograd1d) {
 
   ierr = CeedMalloc(Q1d*P1d, &interp1d); CeedChk(ierr);
   ierr = CeedMalloc(Q1d*P1d, &grad1d); CeedChk(ierr);
-  memcpy(interp1d, (basis)->interp1d, Q1d*P1d*sizeof(basis)->interp1d[0]);
-  memcpy(grad1d, (basis)->grad1d, Q1d*P1d*sizeof(basis)->interp1d[0]);
+  memcpy(interp1d, (basis)->interp, Q1d*P1d*sizeof(basis)->interp[0]);
+  memcpy(grad1d, (basis)->grad, Q1d*P1d*sizeof(basis)->interp[0]);
 
   // QR Factorization, interp1d = Q R
   ierr = CeedQRFactorization(interp1d, tau, Q1d, P1d); CeedChk(ierr);
@@ -433,10 +434,10 @@ int CeedBasisDestroy(CeedBasis *basis) {
   if ((*basis)->Destroy) {
     ierr = (*basis)->Destroy(*basis); CeedChk(ierr);
   }
-  ierr = CeedFree(&(*basis)->interp1d); CeedChk(ierr);
-  ierr = CeedFree(&(*basis)->grad1d); CeedChk(ierr);
-  ierr = CeedFree(&(*basis)->qref1d); CeedChk(ierr);
-  ierr = CeedFree(&(*basis)->qweight1d); CeedChk(ierr);
+  ierr = CeedFree(&(*basis)->interp); CeedChk(ierr);
+  ierr = CeedFree(&(*basis)->grad); CeedChk(ierr);
+  ierr = CeedFree(&(*basis)->qref); CeedChk(ierr);
+  ierr = CeedFree(&(*basis)->qweight); CeedChk(ierr);
   ierr = CeedDestroy(&(*basis)->ceed); CeedChk(ierr);
   ierr = CeedFree(basis); CeedChk(ierr);
   return 0;

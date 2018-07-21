@@ -73,7 +73,7 @@ static int CeedBasisApply_Ref(CeedBasis basis, CeedTransposeMode tmode,
     CeedInt pre = ncomp*CeedPowInt(P, dim-1), post = 1;
     CeedScalar tmp[2][ncomp*Q*CeedPowInt(P>Q?P:Q, dim-1)];
     for (CeedInt d=0; d<dim; d++) {
-      ierr = CeedTensorContract_Ref(basis->ceed, pre, P, post, Q, basis->interp1d,
+      ierr = CeedTensorContract_Ref(basis->ceed, pre, P, post, Q, basis->interp,
                                     tmode, add&&(d==dim-1),
                                     d==0?u:tmp[d%2], d==dim-1?v:tmp[(d+1)%2]);
       CeedChk(ierr);
@@ -100,7 +100,7 @@ static int CeedBasisApply_Ref(CeedBasis basis, CeedTransposeMode tmode,
       CeedInt pre = ncomp*CeedPowInt(P, dim-1), post = 1;
       for (CeedInt d=0; d<dim; d++) {
         ierr = CeedTensorContract_Ref(basis->ceed, pre, P, post, Q,
-                                      (p==d)?basis->grad1d:basis->interp1d,
+                                      (p==d)?basis->grad:basis->interp,
                                       tmode, add&&(d==dim-1),
                                       d==0?u:tmp[d%2], d==dim-1?v:tmp[(d+1)%2]);
         CeedChk(ierr);
@@ -124,7 +124,7 @@ static int CeedBasisApply_Ref(CeedBasis basis, CeedTransposeMode tmode,
       for (CeedInt i=0; i<pre; i++) {
         for (CeedInt j=0; j<Q; j++) {
           for (CeedInt k=0; k<post; k++) {
-            v[(i*Q + j)*post + k] = basis->qweight1d[j]
+            v[(i*Q + j)*post + k] = basis->qweight[j]
                                     * (d == 0 ? 1 : v[(i*Q + j)*post + k]);
           }
         }

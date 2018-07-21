@@ -612,7 +612,7 @@ static int CeedBasisApply_Magma(CeedBasis basis, CeedTransposeMode tmode,
     CeedDebug("\033[01m[CeedBasisApply_Magma] tmpsize = %d",
               ncomp*Q*CeedPowInt(P>Q?P:Q, dim-1));
     for (CeedInt d=0; d<dim; d++) {
-      ierr = CeedTensorContract_Magma(basis->ceed, pre, P, post, Q, basis->interp1d,
+      ierr = CeedTensorContract_Magma(basis->ceed, pre, P, post, Q, basis->interp,
                                       tmode, add&&(d==dim-1),
                                       d==0?u:tmp[d%2], d==dim-1?v:tmp[(d+1)%2]);
       CeedChk(ierr);
@@ -641,7 +641,7 @@ static int CeedBasisApply_Magma(CeedBasis basis, CeedTransposeMode tmode,
       CeedInt pre = ncomp*CeedPowInt(P, dim-1), post = 1;
       for (CeedInt d=0; d<dim; d++) {
         ierr = CeedTensorContract_Magma(basis->ceed, pre, P, post, Q,
-                                        (p==d)?basis->grad1d:basis->interp1d,
+                                        (p==d)?basis->grad:basis->interp,
                                         tmode, add&&(d==dim-1),
                                         d==0?u:tmp[d%2], d==dim-1?v:tmp[(d+1)%2]);
         CeedChk(ierr);
@@ -680,10 +680,10 @@ static int CeedBasisDestroy_Magma(CeedBasis basis) {
 }
 
 static int CeedBasisCreateTensorH1_Magma(Ceed ceed, CeedInt dim, CeedInt P1d,
-    CeedInt Q1d, const CeedScalar *interp1d,
-    const CeedScalar *grad1d,
-    const CeedScalar *qref1d,
-    const CeedScalar *qweight1d,
+    CeedInt Q1d, const CeedScalar *interp,
+    const CeedScalar *grad,
+    const CeedScalar *qref,
+    const CeedScalar *qweight,
     CeedBasis basis) {
   basis->Apply = CeedBasisApply_Magma;
   basis->Destroy = CeedBasisDestroy_Magma;

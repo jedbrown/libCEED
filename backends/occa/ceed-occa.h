@@ -62,10 +62,10 @@ typedef struct {
 typedef struct {
   bool ready;
   CeedElemRestriction er;
-  occaMemory qref1d;
-  occaMemory qweight1d;
-  occaMemory interp1d;
-  occaMemory grad1d;
+  occaMemory qref;
+  occaMemory qweight;
+  occaMemory interp;
+  occaMemory grad;
   occaMemory tmp0,tmp1;
   occaKernel kZero,kInterp,kGrad,kWeight;
 } CeedBasis_Occa;
