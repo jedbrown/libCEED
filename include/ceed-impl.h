@@ -33,6 +33,8 @@ struct Ceed_private {
                                const CeedInt *);
   int (*BasisCreateTensorH1)(Ceed, CeedInt, CeedInt, CeedInt, const CeedScalar *,
                              const CeedScalar *, const CeedScalar *, const CeedScalar *, CeedBasis);
+  int (*BasisCreateH1)(Ceed, CeedInt, CeedBasisShape, CeedInt, CeedInt, const CeedScalar *,
+                             const CeedScalar *, const CeedScalar *, const CeedScalar *, CeedBasis);
   int (*QFunctionCreate)(CeedQFunction);
   int (*OperatorCreate)(CeedOperator);
   int refcount;

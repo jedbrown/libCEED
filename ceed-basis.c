@@ -30,6 +30,7 @@
 ///
 /// @param ceed    Ceed
 /// @param dim     Topological dimension
+/// @param shape   Type of basis shape - simplex, pryamid, or wedge
 /// @param ncomp   Number of field components (1 for scalar fields)
 /// @param P1d     Number of nodes along one edge
 /// @param Q1d     Number of quadrature parallel to one edge 
@@ -87,17 +88,313 @@ int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncom
   }
   (*basis)->P = P;
   (*basis)->Q = Q;
-  ierr = CeedMalloc(Q,&(*basis)->qref); CeedChk(ierr);
+  ierr = CeedMalloc(Q1d,&(*basis)->qref); CeedChk(ierr);
   ierr = CeedMalloc(Q,&(*basis)->qweight); CeedChk(ierr);
-  memcpy((*basis)->qref, qref, Q*sizeof(qref[0]));
+  memcpy((*basis)->qref, qref, Q1d*sizeof(qref[0]));
   memcpy((*basis)->qweight, qweight, Q*sizeof(qweight[0]));
   ierr = CeedMalloc(Q*P,&(*basis)->interp); CeedChk(ierr);
   ierr = CeedMalloc(Q*P,&(*basis)->grad); CeedChk(ierr);
   memcpy((*basis)->interp, interp, Q*P*sizeof(interp[0]));
   memcpy((*basis)->grad, grad, Q*P*sizeof(interp[0]));
   (*basis)->tensorbasis = true;
-  ierr = ceed->BasisCreateTensorH1(ceed, dim, P1d, Q1d, interp, grad, qref,
+  ierr = ceed->BasisCreateH1(ceed, dim, shape, P1d, Q1d, interp, grad, qref,
                                    qweight, *basis); CeedChk(ierr);
+  return 0;
+}
+
+/// Helper function to update node index
+void CeedNodeIndexUpdate(CeedBasisShape shape, CeedInt dim, CeedInt **index, CeedInt **maxindex) {
+  int d;
+
+  // Update node index
+  index[0] += 1;
+  switch (shape) {
+  case CEED_SIMPLEX:
+    // If node exceeds max, update
+    for (d = 0; d < dim; d++) {
+      if (index[d] > maxindex[d]) {
+        index[d] = 0;
+        index[d + 1] += 1;
+        maxindex[d] -= 1;
+      }
+      if (maxindex[d] == 0) {
+        maxindex[d] = maxindex[d+1] - 1;
+      }
+    }      
+    break;
+  case CEED_PRYAMID:
+    // If node exceeds max, update
+    if (index[0] > maxindex[0]) {
+      index[0] = 0;
+      index[1] += 1;
+    }
+    if ((index[0] == maxindex[0]) && (index[1] == maxindex[1]) ) {
+      maxindex[0] -= 1;
+      index[1] -= 1;
+    } 
+    break;
+  case CEED_WEDGE:
+    // If node exceeds max, update
+    if (index[0] > maxindex[0]) {
+      index[0] = 0;
+      index[1] += 1;
+    }
+    if ((index[0] == maxindex[0]) && (index[1] == maxindex[1]) ) {
+      maxindex[1] -= 1;
+    } 
+    break;
+  }
+}
+
+/// Create a Lagrange basis
+///
+/// @param ceed   Ceed
+/// @param dim    Topological dimension of element
+/// @param shape  Basis shape - simplex, pryamid, or wedge
+/// @param ncomp  Number of field components
+/// @param P      Number of Gauss-Lobatto nodes along one edge.  The polynomial 
+///               degree of the resulting Q_k element is k=P-1.
+/// @param Q      Number of quadrature points parallel to one edge
+/// @param qmode  Distribution of the Q quadrature points (affects order of
+///               accuracy for the quadrature)
+/// @param[out]   basis New basis
+///
+/// @sa CeedBasisCreateH1Lagrange()
+int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
+                              CeedInt ncomp, CeedInt P1d, CeedInt Q1d,
+                              CeedQuadMode qmode, CeedBasis *basis) {
+  // Allocate
+  int ierr, d, i, j, k, *nodei, *quadi, *maxnodei, *maxquadi, nodeisum = 0;
+  CeedInt P = 1, Q = 1;
+  CeedScalar sum = 0, nodesum = 0, quadsum = 0, prod, node, quad, *nodes, *interp, *grad, *qweight, *qref1d, *qweight1d;
+  ierr = CeedCalloc(dim, &nodei); CeedChk(ierr);
+  ierr = CeedCalloc(dim, &maxnodei); CeedChk(ierr);
+  ierr = CeedCalloc(dim, &quadi); CeedChk(ierr);
+  ierr = CeedCalloc(dim, &maxquadi); CeedChk(ierr);
+
+
+  switch (shape) {
+  case CEED_SIMPLEX:
+    // Pass 1D case to TensorH1Lagrange, 1D simplex is 1D rectangle
+    if (dim == 1) {
+      ierr = CeedBasisCreateTensorH1Lagrange(ceed, dim, ncomp, P1d, Q1d, qmode,
+                                             basis); CeedChk(ierr);
+      return 0;
+    }
+    for (int i = 0; i < dim; i++)
+      P *= (P1d + i) / (i + 1); 
+    for (int i = 0; i < dim; i++)
+      Q *= (Q1d + i) / (i + 1);
+    break;
+  case CEED_PRYAMID:
+    if (dim != 3)  return CeedError(ceed, 1,
+                                        "Pyramids are only supported with dim = 3");
+    P = 0;
+    for (int i = 0; i < P1d; i++)
+      P += i*i;
+    Q = 0;
+    for (int i = 0; i < Q1d; i++)
+      Q += i*i;
+    break;
+  case CEED_WEDGE:
+    if (dim != 3)  return CeedError(ceed, 1,
+                                        "Wedges are only supported with dim = 3");
+    P = (P1d * (P1d + 1) / 2) * (P1d);
+    Q = (Q1d * (Q1d + 1) / 2) * (Q1d);
+    break;
+  }
+
+  ierr = CeedCalloc(P*Q, &interp); CeedChk(ierr);
+  ierr = CeedCalloc(P*Q, &grad); CeedChk(ierr);
+  ierr = CeedCalloc(P1d, &nodes); CeedChk(ierr);
+  ierr = CeedCalloc(Q, &qweight); CeedChk(ierr);
+  ierr = CeedCalloc(Q1d, &qref1d); CeedChk(ierr);
+  ierr = CeedCalloc(Q1d, &qweight1d); CeedChk(ierr);
+
+  // Get Nodes and Weights
+  ierr = CeedLobattoQuadrature(P1d, nodes, NULL); CeedChk(ierr);
+  switch (qmode) {
+  case CEED_GAUSS:
+    ierr = CeedGaussQuadrature(Q1d, qref1d, qweight1d); CeedChk(ierr);
+    break;
+  case CEED_GAUSS_LOBATTO:
+    ierr = CeedLobattoQuadrature(Q1d, qref1d, qweight1d); CeedChk(ierr);
+    break;
+  }
+  // Shift qref1d
+  for (i = 0; i < Q1d; i++) qref1d[i] = (qref1d[i]+1)/2;
+
+  // Build qweight
+  switch (shape) {
+  case CEED_SIMPLEX:
+    break;
+  case CEED_PRYAMID:
+    break;
+  case CEED_WEDGE:
+    break;
+  }
+
+  // Build B, D matrix
+  for (d = 0; d < dim; d++) {
+    nodei[d] = 0;
+    quadi[d] = 0;
+    maxnodei[d] = P1d;
+    maxquadi[d] = Q1d;
+  }
+  nodei[0] = -1;
+  // Loop through DOFs
+  for (i = 0; d < P; i++) {
+    CeedNodeIndexUpdate(shape, dim, &nodei, &maxnodei);
+    // Loop through quad points
+    for (j = 0; j < Q; j++) {
+      CeedNodeIndexUpdate(shape, dim, &quadi, &maxquadi);
+      prod = 1;
+      // Loop through shape functions for different types of shape functions
+      switch (shape) {
+      case CEED_SIMPLEX:
+        nodeisum = 0;
+        nodesum = 0;
+        quadsum = 0;
+
+        // Get x_1, ..., x_n alone shape functions
+        for (d = 0; d < dim; d++) {
+          // Data needed for single variable face
+          sum = 0;
+          node = nodes[nodei[d]];
+          quad = qref1d[quadi[d]];
+
+          // Data needed for combined face
+          nodeisum += nodei[d];
+          nodesum += node;
+          quadsum += quad;
+
+          for (k = 0; k < nodei[d]; k ++) {
+            sum += (quad - nodes[k]) / (node - nodes[k]);
+          }
+          if (sum) prod *= sum;
+        }
+
+        // Get combination shape functions
+        sum = 0;
+        for (k = P1d; k > nodeisum; k--) {
+          sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
+        }
+        if (sum) prod *= sum;
+
+        break;
+      case CEED_PRYAMID:
+        nodeisum = 0;
+        nodesum = 0;
+        quadsum = 0;
+
+        // Get x_2, x_3 alone shape functions
+        for (d = 1; d < 3; d++) {
+          // Data needed for single variable face
+          sum = 0;
+          node = nodes[nodei[d]];
+          quad = qref1d[quadi[d]];
+
+          // Data needed for combined face
+          nodeisum += nodei[d];
+          nodesum += node;
+          quadsum += quad;
+
+          for (k = 0; k < nodei[d]; k ++) {
+            sum += (quad - nodes[k]) / (node - nodes[k]);
+          }
+          if (sum) prod *= sum;
+        }
+
+        // Get x_2, x_3 combination shape functions
+        sum = 0;
+        for (k = P1d; k > nodeisum; k--) {
+          sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
+        }
+        if (sum) prod *= sum;
+
+        // Get x_1 shape functions
+        sum = 0;
+        node = nodes[nodei[0]];
+        quad = qref1d[quadi[0]];
+
+        for (k = 0; k < nodei[0]; k++) {
+          sum += (quad - nodes[k]) / (node - nodes[k]);
+        }
+        if (sum) prod *= sum;
+
+        // get x_1, x_3 combination shape functions
+        sum = 0;
+        nodesum = nodei[0] + nodei[2];
+        nodesum = nodes[nodei[0]] + nodes[nodei[2]];
+        quadsum = qref1d[quadi[0]] + qref1d[quadi[2]];
+        for (k = P1d; k > nodeisum; k--) {
+          sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
+        }
+        if (sum) prod *= sum;
+
+        break;
+      case CEED_WEDGE:
+        nodeisum = 0;
+        nodesum = 0;
+        quadsum = 0;
+
+        // Get x_2, x_3 alone shape functions
+        for (d = 1; d < 3; d++) {
+          // Data needed for single variable face
+          sum = 0;
+          node = nodes[nodei[d]];
+          quad = qref1d[quadi[d]];
+
+          // Data needed for combined face
+          nodeisum += nodei[d];
+          nodesum += node;
+          quadsum += quad;
+
+          for (k = 0; k < nodei[d]; k ++) {
+            sum += (quad - nodes[k]) / (node - nodes[k]);
+          }
+          if (sum) prod *= sum;
+        }
+
+        // Get x_2, x_3 combination shape functions
+        sum = 0;
+        for (k = P1d; k > nodeisum; k--) {
+          sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
+        }
+        if (sum) prod *= sum;
+
+        // Get x_1 shape functions
+        sum = 0;
+        node = nodes[nodei[0]];
+        quad = qref1d[quadi[0]];
+        for (k = 0; k < P1d; k++) {
+          if (k != nodei[0]) {
+            sum += (quad - nodes[k]) / (node - nodes[k]);
+          }
+        }
+        if (sum) prod *= sum;
+
+        break;
+      }
+      interp[i*P+j] = prod;
+    }
+  }
+
+  //  // Pass to CeedBasisCreateH1
+  ierr = CeedBasisCreateH1(ceed, dim, shape, ncomp, P1d, Q1d, interp, grad, qref1d,
+                                 qweight, basis); CeedChk(ierr);
+  // Free data
+  ierr = CeedFree(&interp); CeedChk(ierr);
+  ierr = CeedFree(&grad); CeedChk(ierr);
+  ierr = CeedFree(&nodes); CeedChk(ierr);
+  ierr = CeedFree(&qweight); CeedChk(ierr);
+  ierr = CeedFree(&qref1d); CeedChk(ierr);
+  ierr = CeedFree(&qweight1d); CeedChk(ierr);
+  // Free helper data
+  ierr = CeedFree(&nodei); CeedChk(ierr);
+  ierr = CeedFree(&maxnodei); CeedChk(ierr);
+  ierr = CeedFree(&quadi); CeedChk(ierr);
+  ierr = CeedFree(&maxquadi); CeedChk(ierr);
   return 0;
 }
 
@@ -118,7 +415,7 @@ int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncom
 ///               reference element
 /// @param[out] basis New basis
 ///
-/// @sa CeedBasisCreateTensorH1Lagrange()
+/// @sa CeedBasisCreateTensorH1()
 int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp, CeedInt P1d,
                             CeedInt Q1d, const CeedScalar *interp1d,
                             const CeedScalar *grad1d, const CeedScalar *qref1d,
@@ -153,17 +450,17 @@ int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp, CeedInt P1d,
 
 /// Create a tensor product Lagrange basis
 ///
-/// @param ceed Ceed
-/// @param dim Topological dimension of element
+/// @param ceed  Ceed
+/// @param dim   Topological dimension of element
 /// @param ncomp Number of field components
-/// @param P Number of Gauss-Lobatto nodes in one dimension.  The polynomial degree
-///     of the resulting Q_k element is k=P-1.
-/// @param Q Number of quadrature points in one dimension.
+/// @param P     Number of Gauss-Lobatto nodes in one dimension.  The polynomial 
+///              degree of the resulting Q_k element is k=P-1.
+/// @param Q     Number of quadrature points in one dimension.
 /// @param qmode Distribution of the Q quadrature points (affects order of
-///     accuracy for the quadrature)
-/// @param[out] basis New basis
+///              accuracy for the quadrature)
+/// @param[out]  basis New basis
 ///
-/// @sa CeedBasisCreateTensorH1()
+/// @sa CeedBasisCreateTensorH1Lagrange()
 int CeedBasisCreateTensorH1Lagrange(Ceed ceed, CeedInt dim, CeedInt ncomp,
                                     CeedInt P, CeedInt Q,
                                     CeedQuadMode qmode, CeedBasis *basis) {

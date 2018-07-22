@@ -235,13 +235,13 @@ typedef enum {
 } CeedBasisShape;
 
 CEED_EXTERN int CeedBasisCreateTensorH1Lagrange(Ceed ceed, CeedInt dim,
-    CeedInt ndof, CeedInt P, CeedInt Q, CeedQuadMode qmode, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ndof,
+    CeedInt ncomp, CeedInt P1d, CeedInt Q1d, CeedQuadMode qmode, CeedBasis *basis);
+CEED_EXTERN int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp,
                                         CeedInt P1d, CeedInt Q1d, const CeedScalar *interp1d, const CeedScalar *grad1d,
                                         const CeedScalar *qref1d, const CeedScalar *qweight1d, CeedBasis *basis);
 CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
-    CeedInt ndof, CeedInt P, CeedInt Q, CeedQuadMode qmode, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ndof,
+    CeedInt ncomp, CeedInt P1d, CeedInt Q1d, CeedQuadMode qmode, CeedBasis *basis);
+CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncomp,
                                    CeedInt P1d, CeedInt Q1d, const CeedScalar *interp, const CeedScalar *grad,
                                    const CeedScalar *qref, const CeedScalar *qweight, CeedBasis *basis);
 CEED_EXTERN int CeedBasisView(CeedBasis basis, FILE *stream);
