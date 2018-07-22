@@ -228,8 +228,8 @@ typedef enum {
 typedef enum {
   /// Simplex/tet - 2D or 3D shape
   CEED_SIMPLEX = 0,
-  /// Pyramed - 3D shape
-  CEED_PRYAMED = 1,
+  /// Pyramid - 3D shape
+  CEED_PRYAMID = 1,
   /// Wedge - 3D shape
   CEED_WEDGE = 2,
 } CeedBasisShape;
@@ -241,7 +241,7 @@ CEED_EXTERN int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ndof,
                                         const CeedScalar *qref1d, const CeedScalar *qweight1d, CeedBasis *basis);
 CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
     CeedInt ndof, CeedInt P, CeedInt Q, CeedQuadMode qmode, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedInt ndof,
+CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ndof,
                                    CeedInt P1d, CeedInt Q1d, const CeedScalar *interp, const CeedScalar *grad,
                                    const CeedScalar *qref, const CeedScalar *qweight, CeedBasis *basis);
 CEED_EXTERN int CeedBasisView(CeedBasis basis, FILE *stream);

@@ -92,6 +92,8 @@ struct CeedBasis_private {
   CeedInt ncomp;         /* number of field components (1 for scalar fields) */
   CeedInt P1d;           /* number of nodes in one dimension */
   CeedInt Q1d;           /* number of quadrature points in one dimension */
+  CeedInt P;             /* number of nodes total */
+  CeedInt Q;             /* number of quadrature points total */
   CeedScalar *qref;      /* Array of length Q1d (for tensor elements) holding the  
                             locations of quadrature points on the 1D reference
                             element [-1, 1] for tensor elements or all quadrature 

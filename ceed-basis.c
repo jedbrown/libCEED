@@ -26,6 +26,81 @@
 /// @defgroup CeedBasis CeedBasis: fully discrete finite element-like objects
 /// @{
 
+/// Create a basis for H^1 discretizations
+///
+/// @param ceed    Ceed
+/// @param dim     Topological dimension
+/// @param ncomp   Number of field components (1 for scalar fields)
+/// @param P1d     Number of nodes along one edge
+/// @param Q1d     Number of quadrature parallel to one edge 
+/// @param interp  Row-major Q × P matrix expressing the values of nodal
+///                basis functions at quadrature points
+/// @param grad    Row-major Q × P matrix expressing derivatives of nodal
+///                basis functions at quadrature points
+/// @param qref    Array of length Q holding the locations of quadrature points
+///                on the reference element
+/// @param qweight Array of length Q holding the quadrature weights on the
+///                reference element
+/// @param[out]    basis New basis
+///
+/// @sa CeedBasisCreateTensorH1s()
+int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncomp,
+                            CeedInt P1d,CeedInt Q1d, const CeedScalar *interp,
+                            const CeedScalar *grad, const CeedScalar *qref,
+                            const CeedScalar *qweight, CeedBasis *basis) {
+  int ierr;
+  CeedInt P = 1, Q = 1;
+
+  if (!ceed->BasisCreateTensorH1)
+    return CeedError(ceed, 1, "Backend does not support BasisCreateTensorH1");
+  ierr = CeedCalloc(1,basis); CeedChk(ierr);
+  (*basis)->ceed = ceed;
+  ceed->refcount++;
+  (*basis)->refcount = 1;
+  (*basis)->dim = dim;
+  (*basis)->ncomp = ncomp;
+  (*basis)->P1d = P1d;
+  (*basis)->Q1d = Q1d;
+  switch (shape) {
+  case CEED_SIMPLEX:
+    for (int i = 0; i < dim; i++)
+      P *= (P1d + i) / (i + 1); 
+    for (int i = 0; i < dim; i++)
+      Q *= (Q1d + i) / (i + 1);
+    break;
+  case CEED_PRYAMID:
+    if (dim != 3)  return CeedError(ceed, 1,
+                                        "Pyrameds are only supported with dim = 3");
+    P = 0;
+    for (int i = 0; i < P1d; i++)
+      P += i*i;
+    Q = 0;
+    for (int i = 0; i < Q1d; i++)
+      Q += i*i;
+    break;
+  case CEED_WEDGE:
+    if (dim != 3)  return CeedError(ceed, 1,
+                                        "Wedges are only supported with dim = 3");
+    P = (P1d * (P1d + 1) / 2) * (P1d);
+    Q = (Q1d * (Q1d + 1) / 2) * (Q1d);
+    break;
+  }
+  (*basis)->P = P;
+  (*basis)->Q = Q;
+  ierr = CeedMalloc(Q,&(*basis)->qref); CeedChk(ierr);
+  ierr = CeedMalloc(Q,&(*basis)->qweight); CeedChk(ierr);
+  memcpy((*basis)->qref, qref, Q*sizeof(qref[0]));
+  memcpy((*basis)->qweight, qweight, Q*sizeof(qweight[0]));
+  ierr = CeedMalloc(Q*P,&(*basis)->interp); CeedChk(ierr);
+  ierr = CeedMalloc(Q*P,&(*basis)->grad); CeedChk(ierr);
+  memcpy((*basis)->interp, interp, Q*P*sizeof(interp[0]));
+  memcpy((*basis)->grad, grad, Q*P*sizeof(interp[0]));
+  (*basis)->tensorbasis = true;
+  ierr = ceed->BasisCreateTensorH1(ceed, dim, P1d, Q1d, interp, grad, qref,
+                                   qweight, *basis); CeedChk(ierr);
+  return 0;
+}
+
 /// Create a tensor product basis for H^1 discretizations
 ///
 /// @param ceed   Ceed
@@ -60,6 +135,8 @@ int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp, CeedInt P1d,
   (*basis)->ncomp = ncomp;
   (*basis)->P1d = P1d;
   (*basis)->Q1d = Q1d;
+  (*basis)->P = CeedPowInt(P1d, dim);
+  (*basis)->Q = CeedPowInt(Q1d, dim);
   ierr = CeedMalloc(Q1d,&(*basis)->qref); CeedChk(ierr);
   ierr = CeedMalloc(Q1d,&(*basis)->qweight); CeedChk(ierr);
   memcpy((*basis)->qref, qref1d, Q1d*sizeof(qref1d[0]));
@@ -270,16 +347,29 @@ static int CeedScalarView(const char *name, const char *fpformat, CeedInt m,
 int CeedBasisView(CeedBasis basis, FILE *stream) {
   int ierr;
 
-  fprintf(stream, "CeedBasis: dim=%d P=%d Q=%d\n", basis->dim, basis->P1d,
-          basis->Q1d);
-  ierr = CeedScalarView("qref", "\t% 12.8f", 1, basis->Q1d, basis->qref,
-                        stream); CeedChk(ierr);
-  ierr = CeedScalarView("qweight", "\t% 12.8f", 1, basis->Q1d, basis->qweight,
-                        stream); CeedChk(ierr);
-  ierr = CeedScalarView("interp", "\t% 12.8f", basis->Q1d, basis->P1d,
-                        basis->interp, stream); CeedChk(ierr);
-  ierr = CeedScalarView("grad", "\t% 12.8f", basis->Q1d, basis->P1d,
-                        basis->grad, stream); CeedChk(ierr);
+  if (basis->tensorbasis) {
+    fprintf(stream, "CeedBasis: dim=%d P=%d Q=%d\n", basis->dim, basis->P1d,
+            basis->Q1d);
+    ierr = CeedScalarView("qref1d", "\t% 12.8f", 1, basis->Q1d, basis->qref,
+                          stream); CeedChk(ierr);
+    ierr = CeedScalarView("qweight1d", "\t% 12.8f", 1, basis->Q1d, basis->qweight,
+                          stream); CeedChk(ierr);
+    ierr = CeedScalarView("interp1d", "\t% 12.8f", basis->Q1d, basis->P1d,
+                          basis->interp, stream); CeedChk(ierr);
+    ierr = CeedScalarView("grad1d", "\t% 12.8f", basis->Q1d, basis->P1d,
+                          basis->grad, stream); CeedChk(ierr);
+  } else {
+    fprintf(stream, "CeedBasis: dim=%d P=%d Q=%d\n", basis->dim, basis->P1d,
+            basis->Q1d);
+    ierr = CeedScalarView("qref", "\t% 12.8f", 1, basis->Q, basis->qref,
+                          stream); CeedChk(ierr);
+    ierr = CeedScalarView("qweight", "\t% 12.8f", 1, basis->Q, basis->qweight,
+                          stream); CeedChk(ierr);
+    ierr = CeedScalarView("interp", "\t% 12.8f", basis->Q, basis->P,
+                          basis->interp, stream); CeedChk(ierr);
+    ierr = CeedScalarView("grad", "\t% 12.8f", basis->Q, basis->P,
+                          basis->grad, stream); CeedChk(ierr);
+  }
   return 0;
 }
 
