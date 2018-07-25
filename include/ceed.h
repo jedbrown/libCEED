@@ -226,22 +226,24 @@ typedef enum {
 /// Type of basis shape to create non-tensor H1 element basis
 /// @ingrounp CeedBasis
 typedef enum {
-  /// Simplex/tet - 2D or 3D shape
-  CEED_SIMPLEX = 0,
+  /// Quad/Hex/Hypercube - 1+D shape
+  CEED_HCUBE = 0,
+  /// Simplex/tet - 2+D shape
+  CEED_SIMPLEX = 1,
   /// Pyramid - 3D shape
-  CEED_PRYAMID = 1,
+  CEED_PRYAMID = 2,
   /// Wedge - 3D shape
-  CEED_WEDGE = 2,
-} CeedBasisShape;
+  CEED_WEDGE = 4,
+} CeedElemTopology;
 
 CEED_EXTERN int CeedBasisCreateTensorH1Lagrange(Ceed ceed, CeedInt dim,
     CeedInt ncomp, CeedInt P1d, CeedInt Q1d, CeedQuadMode qmode, CeedBasis *basis);
 CEED_EXTERN int CeedBasisCreateTensorH1(Ceed ceed, CeedInt dim, CeedInt ncomp,
                                         CeedInt P1d, CeedInt Q1d, const CeedScalar *interp1d, const CeedScalar *grad1d,
                                         const CeedScalar *qref1d, const CeedScalar *qweight1d, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
+CEED_EXTERN int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedElemTopology topo,
     CeedInt ncomp, CeedInt P1d, CeedInt Q1d, CeedQuadMode qmode, CeedBasis *basis);
-CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncomp,
+CEED_EXTERN int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedElemTopology topo, CeedInt ncomp,
                                    CeedInt P1d, CeedInt Q1d, const CeedScalar *interp, const CeedScalar *grad,
                                    const CeedScalar *qref, const CeedScalar *qweight, CeedBasis *basis);
 CEED_EXTERN int CeedBasisView(CeedBasis basis, FILE *stream);

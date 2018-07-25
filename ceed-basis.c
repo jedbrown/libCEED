@@ -30,7 +30,7 @@
 ///
 /// @param ceed    Ceed
 /// @param dim     Topological dimension
-/// @param shape   Type of basis shape - simplex, pryamid, or wedge
+/// @param topo    Type of basis topo - simplex, pryamid, or wedge
 /// @param ncomp   Number of field components (1 for scalar fields)
 /// @param P1d     Number of nodes along one edge
 /// @param Q1d     Number of quadrature parallel to one edge 
@@ -44,8 +44,8 @@
 ///                reference element
 /// @param[out]    basis New basis
 ///
-/// @sa CeedBasisCreateTensorH1s()
-int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncomp,
+/// @sa CeedBasisCreateH1()
+int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedElemTopology topo, CeedInt ncomp,
                             CeedInt P1d,CeedInt Q1d, const CeedScalar *interp,
                             const CeedScalar *grad, const CeedScalar *qref,
                             const CeedScalar *qweight, CeedBasis *basis) {
@@ -62,12 +62,20 @@ int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncom
   (*basis)->ncomp = ncomp;
   (*basis)->P1d = P1d;
   (*basis)->Q1d = Q1d;
-  switch (shape) {
+  switch (topo) {
+  case CEED_HCUBE:
+    for (int i = 0; i < dim; i++) {
+      P *= P1d; 
+      Q *= Q1d;
+    }
+    break;    
   case CEED_SIMPLEX:
-    for (int i = 0; i < dim; i++)
+    if (dim < 2)  return CeedError(ceed, 1,
+                                        "Simplexes are only supported with dim > 1");
+    for (int i = 0; i < dim; i++) {
       P *= (P1d + i) / (i + 1); 
-    for (int i = 0; i < dim; i++)
       Q *= (Q1d + i) / (i + 1);
+    }
     break;
   case CEED_PRYAMID:
     if (dim != 3)  return CeedError(ceed, 1,
@@ -97,18 +105,27 @@ int CeedBasisCreateH1(Ceed ceed, CeedInt dim, CeedBasisShape shape, CeedInt ncom
   memcpy((*basis)->interp, interp, Q*P*sizeof(interp[0]));
   memcpy((*basis)->grad, grad, Q*P*sizeof(interp[0]));
   (*basis)->tensorbasis = true;
-  ierr = ceed->BasisCreateH1(ceed, dim, shape, P1d, Q1d, interp, grad, qref,
+  ierr = ceed->BasisCreateH1(ceed, dim, topo, P1d, Q1d, interp, grad, qref,
                                    qweight, *basis); CeedChk(ierr);
   return 0;
 }
 
 /// Helper function to update node index
-void CeedNodeIndexUpdate(CeedBasisShape shape, CeedInt dim, CeedInt **index, CeedInt **maxindex) {
+void CeedNodeIndexUpdate(CeedElemTopology topo, CeedInt dim, CeedInt **index, CeedInt **maxindex) {
   int d;
 
   // Update node index
   index[0] += 1;
-  switch (shape) {
+  switch (topo) {
+  case CEED_HCUBE:
+    // If node exceeds max, update
+    for (d = 0; d < dim; d++) {
+      if (index[d] > maxindex[d]) {
+        index[d] = 0;
+        index[d + 1] += 1;
+      }
+    }
+    break;
   case CEED_SIMPLEX:
     // If node exceeds max, update
     for (d = 0; d < dim; d++) {
@@ -150,7 +167,7 @@ void CeedNodeIndexUpdate(CeedBasisShape shape, CeedInt dim, CeedInt **index, Cee
 ///
 /// @param ceed   Ceed
 /// @param dim    Topological dimension of element
-/// @param shape  Basis shape - simplex, pryamid, or wedge
+/// @param topo  Basis topo - simplex, pryamid, or wedge
 /// @param ncomp  Number of field components
 /// @param P      Number of Gauss-Lobatto nodes along one edge.  The polynomial 
 ///               degree of the resulting Q_k element is k=P-1.
@@ -160,7 +177,7 @@ void CeedNodeIndexUpdate(CeedBasisShape shape, CeedInt dim, CeedInt **index, Cee
 /// @param[out]   basis New basis
 ///
 /// @sa CeedBasisCreateH1Lagrange()
-int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
+int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedElemTopology topo,
                               CeedInt ncomp, CeedInt P1d, CeedInt Q1d,
                               CeedQuadMode qmode, CeedBasis *basis) {
   // Allocate
@@ -173,18 +190,20 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
   ierr = CeedCalloc(dim, &maxquadi); CeedChk(ierr);
 
 
-  switch (shape) {
-  case CEED_SIMPLEX:
-    // Pass 1D case to TensorH1Lagrange, 1D simplex is 1D rectangle
-    if (dim == 1) {
-      ierr = CeedBasisCreateTensorH1Lagrange(ceed, dim, ncomp, P1d, Q1d, qmode,
-                                             basis); CeedChk(ierr);
-      return 0;
+  switch (topo) {
+  case CEED_HCUBE:
+    for (int i = 0; i < dim; i++) {
+      P *= P1d; 
+      Q *= Q1d;
     }
-    for (int i = 0; i < dim; i++)
+    break;    
+  case CEED_SIMPLEX:
+    if (dim < 2)  return CeedError(ceed, 1,
+                                        "Simplexes are only supported with dim > 1");
+    for (int i = 0; i < dim; i++) {
       P *= (P1d + i) / (i + 1); 
-    for (int i = 0; i < dim; i++)
       Q *= (Q1d + i) / (i + 1);
+    }
     break;
   case CEED_PRYAMID:
     if (dim != 3)  return CeedError(ceed, 1,
@@ -225,7 +244,9 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
   for (i = 0; i < Q1d; i++) qref1d[i] = (qref1d[i]+1)/2;
 
   // Build qweight
-  switch (shape) {
+  switch (topo) {
+  case CEED_HCUBE:
+    break;
   case CEED_SIMPLEX:
     break;
   case CEED_PRYAMID:
@@ -244,19 +265,21 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
   nodei[0] = -1;
   // Loop through DOFs
   for (i = 0; d < P; i++) {
-    CeedNodeIndexUpdate(shape, dim, &nodei, &maxnodei);
+    CeedNodeIndexUpdate(topo, dim, &nodei, &maxnodei);
     // Loop through quad points
     for (j = 0; j < Q; j++) {
-      CeedNodeIndexUpdate(shape, dim, &quadi, &maxquadi);
+      CeedNodeIndexUpdate(topo, dim, &quadi, &maxquadi);
       prod = 1;
-      // Loop through shape functions for different types of shape functions
-      switch (shape) {
+      // Loop through topo functions for different types of topo functions
+      switch (topo) {
+      case CEED_HCUBE:
+        break;
       case CEED_SIMPLEX:
         nodeisum = 0;
         nodesum = 0;
         quadsum = 0;
 
-        // Get x_1, ..., x_n alone shape functions
+        // Get x_1, ..., x_n alone topo functions
         for (d = 0; d < dim; d++) {
           // Data needed for single variable face
           sum = 0;
@@ -274,7 +297,7 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
           if (sum) prod *= sum;
         }
 
-        // Get combination shape functions
+        // Get combination topo functions
         sum = 0;
         for (k = P1d; k > nodeisum; k--) {
           sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
@@ -287,7 +310,7 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
         nodesum = 0;
         quadsum = 0;
 
-        // Get x_2, x_3 alone shape functions
+        // Get x_2, x_3 alone topo functions
         for (d = 1; d < 3; d++) {
           // Data needed for single variable face
           sum = 0;
@@ -305,14 +328,14 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
           if (sum) prod *= sum;
         }
 
-        // Get x_2, x_3 combination shape functions
+        // Get x_2, x_3 combination topo functions
         sum = 0;
         for (k = P1d; k > nodeisum; k--) {
           sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
         }
         if (sum) prod *= sum;
 
-        // Get x_1 shape functions
+        // Get x_1 topo functions
         sum = 0;
         node = nodes[nodei[0]];
         quad = qref1d[quadi[0]];
@@ -322,7 +345,7 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
         }
         if (sum) prod *= sum;
 
-        // get x_1, x_3 combination shape functions
+        // get x_1, x_3 combination topo functions
         sum = 0;
         nodesum = nodei[0] + nodei[2];
         nodesum = nodes[nodei[0]] + nodes[nodei[2]];
@@ -338,7 +361,7 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
         nodesum = 0;
         quadsum = 0;
 
-        // Get x_2, x_3 alone shape functions
+        // Get x_2, x_3 alone topo functions
         for (d = 1; d < 3; d++) {
           // Data needed for single variable face
           sum = 0;
@@ -356,14 +379,14 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
           if (sum) prod *= sum;
         }
 
-        // Get x_2, x_3 combination shape functions
+        // Get x_2, x_3 combination topo functions
         sum = 0;
         for (k = P1d; k > nodeisum; k--) {
           sum += (quadsum - nodes[k]) / (nodesum - nodes[k]);
         }
         if (sum) prod *= sum;
 
-        // Get x_1 shape functions
+        // Get x_1 topo functions
         sum = 0;
         node = nodes[nodei[0]];
         quad = qref1d[quadi[0]];
@@ -381,7 +404,7 @@ int CeedBasisCreateH1Lagrange(Ceed ceed, CeedInt dim, CeedBasisShape shape,
   }
 
   //  // Pass to CeedBasisCreateH1
-  ierr = CeedBasisCreateH1(ceed, dim, shape, ncomp, P1d, Q1d, interp, grad, qref1d,
+  ierr = CeedBasisCreateH1(ceed, dim, topo, ncomp, P1d, Q1d, interp, grad, qref1d,
                                  qweight, basis); CeedChk(ierr);
   // Free data
   ierr = CeedFree(&interp); CeedChk(ierr);
