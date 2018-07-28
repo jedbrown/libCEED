@@ -92,20 +92,21 @@ cd ../..
 
 # Nek+libCEED examples on CPU and GPU
 cd examples/nek5000
-./generate-boxes.sh 2 4
 ./make-nek-examples.sh
-./run-nek-example.sh -ceed /cpu/self -b b3
-./run-nek-example.sh -ceed /gpu/occa -b b3
+./run-nek-example.sh -ceed /cpu/self -b 3
+./run-nek-example.sh -ceed /gpu/occa -b 3
 cd ../..
 ```
 
 The above code assumes a GPU-capable machine enabled in the OCCA
-backend. Depending on the availabl backends, other Ceed resource specifiers can
+backend. Depending on the available backends, other Ceed resource specifiers can
 be provided with the `-ceed` option, for example:
 
 CEED resource (`-ceed`) | Backend
 ----------------------- | ---------------------------------
-`/cpu/self`             | Serial reference implementation
+`/cpu/self/opt`         | Serial optimized implementation
+`/cpu/self/ref`         | Serial reference implementation
+`/cpu/self/tmpl`        | Backend template, dispatches to /cpu/self/opt
 `/cpu/occa`             | Serial OCCA kernels
 `/gpu/occa`             | CUDA OCCA kernels
 `/omp/occa`             | OpenMP OCCA kernels

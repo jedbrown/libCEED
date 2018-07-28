@@ -30,9 +30,9 @@ fi
 
 # Set defaults for the parameters
 : ${CEED_DIR:=`cd ../../; pwd`}
-nek_ex=bp1
+nek_examples=(bp1 bp3)
 nek_spec=/cpu/self
-nek_np=4
+nek_np=1
 nek_box=
 NEK_BOX_DIR=./boxes
 
@@ -45,11 +45,11 @@ options:
    -h|-help     Print this usage information and exit
    -c|-ceed     Ceed backend to be used for the run (optional, default: /cpu/self)
    -e|-example  Example name (optional, default: bp1)
-   -n|-np       Specify number of MPI ranks for the run (optional, default: 4)
+   -n|-np       Specify number of MPI ranks for the run (optional, default: 1)
    -b|-box      Specify the box geometry to be found in ./boxes/ directory (Mandatory)
 
 Example:
-  ./run-nek-example -c /cpu/self -e bp1 -n 4 -b b3
+  ./run-nek-example -c /cpu/self -e bp1 -n 4 -b 3
 "
 
 # Read in parameter values
@@ -79,22 +79,31 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-if [[ ! -f ${nek_ex} ]]; then
-  echo "Example ${nek_ex} does not exist. Build it with make-nek-examples.sh"
-  ${NEK_EXIT_CMD} 1
-fi
-if [[ ! -f ${NEK_BOX_DIR}/b${nek_box}/b${nek_box}.rea || \
-	! -f ${NEK_BOX_DIR}/b${nek_box}/b${nek_box}.map ]]; then
-  ./generate-boxes.sh ${nek_box} ${nek_box}
+if [[ -z "${nek_box}" ]]; then
+    echo "$0: You must specify option -b <number of boxes>."
+    echo "$NEK_HELP_MSG"
+    ${NEK_EXIT_CMD} 1
 fi
 
-echo b${nek_box}                              > SESSION.NAME
-echo `cd ${NEK_BOX_DIR}/b${nek_box}; pwd`'/' >> SESSION.NAME
-rm -f logfile
-rm -f ioinfo
-mv ${nek_ex}.log.${nek_np}.b${nek_box} ${nek_ex}.log1.${nek_np}.b${nek_box} 2>/dev/null
+for nek_ex in "${nek_examples[@]}"; do
+  echo "Running Nek example: $nek_ex"
+  if [[ ! -f ${nek_ex} ]]; then
+    echo "  Example ${nek_ex} does not exist. Build it with make-nek-examples.sh"
+    ${NEK_EXIT_CMD} 1
+  fi
+  if [[ ! -f ${NEK_BOX_DIR}/b${nek_box}/b${nek_box}.rea || \
+	  ! -f ${NEK_BOX_DIR}/b${nek_box}/b${nek_box}.map ]]; then
+    ./generate-boxes.sh ${nek_box} ${nek_box}
+  fi
 
-${MPIEXEC:-mpiexec} -np ${nek_np} ./${nek_ex} ${nek_spec} > ${nek_ex}.log.${nek_np}.b${nek_box}
-wait $!
+  echo b${nek_box}                              > SESSION.NAME
+  echo `cd ${NEK_BOX_DIR}/b${nek_box}; pwd`'/' >> SESSION.NAME
+  rm -f logfile
+  rm -f ioinfo
+  mv ${nek_ex}.log.${nek_np}.b${nek_box} ${nek_ex}.log1.${nek_np}.b${nek_box} 2>/dev/null
 
-echo "Run finished. Output was written to ${nek_ex}.log.${nek_np}.b${nek_box}"
+  ${MPIEXEC:-mpiexec} -np ${nek_np} ./${nek_ex} ${nek_spec} > ${nek_ex}.log.${nek_np}.b${nek_box}
+  wait $!
+
+  echo "  Run finished. Output was written to ${nek_ex}.log.${nek_np}.b${nek_box}"
+done
