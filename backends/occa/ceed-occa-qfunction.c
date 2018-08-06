@@ -197,7 +197,7 @@ static int CeedQFunctionDestroy_Occa(CeedQFunction qf) {
   const bool operator_setup = data->op;
   free(data->oklPath);
   dbg("[CeedQFunction][Destroy]");
-  occaFree(data->kQFunctionApply);
+  // occaFree(data->kQFunctionApply);
   if (data->ready) {
     if (!operator_setup) {
       occaFree(data->d_ctx);
