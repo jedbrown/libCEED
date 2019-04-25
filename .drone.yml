@@ -1,0 +1,11 @@
+kind: pipeline
+name: default
+
+steps:
+- name: test
+  image: jedbrown/petsc-root
+  commands:
+  - whoami
+  - cat /proc/cpuinfo
+  - make
+  - make prove-all
